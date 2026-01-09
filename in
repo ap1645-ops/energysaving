@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>國小節能減碳大挑戰 - 修正版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #eefbff 0%, #f0fff4 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 注音排版適應性調整 */
+        ruby {
+            ruby-position: ruby-over; 
+            ruby-align: center;
+            display: inline-flex;
+            flex-direction: row;
+            align-items: center;
+            white-space: nowrap; 
+        }
+
+        rt {
+            font-size: 0.4em;
+            writing-mode: vertical-rl; 
+            text-orientation: upright;
+            line-height: 1;
+            padding-left: 2px;
+            color: #4b5563;
+            user-select: none;
+        }
+
+        .no-wrap-text {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: center;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .drop-zone {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 3px dashed #cbd5e1;
+            position: relative;
+            min-height: 120px;
+        }
+
+        .drop-zone.drag-over {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.2);
+        }
+
+        .badge-card {
+            cursor: grab;
+            transition: all 0.25s ease;
+            user-select: none;
+            touch-action: none; 
+            background: white;
+        }
+
+        .badge-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .dragging {
+            opacity: 0.5;
+            transform: scale(0.9);
+        }
+
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px) rotate(-3deg); }
+            75% { transform: translateX(8px) rotate(3deg); }
+        }
+
+        .bounce-in {
+            animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 讓元素在容器內平滑滑動 */
+        #badges-container {
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="flex flex-col items-center">
+
+    <!-- 啟動畫面 -->
+    <div id="start-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-white/95 backdrop-blur-xl text-center">
+        <h1 class="text-4xl md:text-6xl font-black text-green-700 mb-6 drop-shadow-sm">🌿 <br class="sm:hidden">節能環保英雄榜</h1>
+        <p class="text-xl text-gray-600 mb-12">準備好接受挑戰了嗎？</p>
+        
+        <div class="flex flex-col sm:flex-row gap-6 w-full max-w-2xl px-4">
+            <button onclick="startGame('zh')" class="flex-1 py-10 bg-white border-4 border-green-500 rounded-[2.5rem] shadow-xl hover:bg-green-50 transition-all active:scale-95 group">
+                <span class="text-6xl mb-4 block group-hover:rotate-12 transition">📝</span>
+                <span class="text-3xl font-bold text-green-700 block">中高年級</span>
+                <span class="text-sm text-gray-400 mt-2 block font-medium">看國字挑戰</span>
+            </button>
+            <button onclick="startGame('zy')" class="flex-1 py-10 bg-white border-4 border-blue-500 rounded-[2.5rem] shadow-xl hover:bg-blue-50 transition-all active:scale-95 group">
+                <span class="text-6xl mb-4 block group-hover:rotate-12 transition">👶</span>
+                <span class="text-3xl font-bold text-blue-700 block">低年級</span>
+                <span class="text-sm text-gray-400 mt-2 block font-medium">漢字 + 注音</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲主畫面 -->
+    <div id="game-ui" class="hidden w-full max-w-6xl px-4 py-6 md:p-8 flex flex-col min-h-screen">
+        
+        <button onclick="goHome()" class="self-end mb-4 bg-white/80 hover:bg-white px-5 py-2 rounded-full shadow-sm border border-gray-200 transition flex items-center gap-2 group">
+            <span class="group-hover:rotate-12 transition">🏠</span>
+            <span id="ui-home-btn" class="font-bold text-gray-700"></span>
+        </button>
+
+        <header class="text-center mb-8">
+            <h1 id="ui-title" class="text-3xl md:text-5xl font-black text-green-700 mb-3 flex justify-center no-wrap-text"></h1>
+            <div id="ui-subtitle" class="text-sm md:text-lg text-gray-500 font-medium flex justify-center mb-6"></div>
+            
+            <div class="flex justify-center">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-3xl shadow-lg ring-4 ring-blue-100">
+                    <span id="ui-progress-label" class="text-[10px] block opacity-70 font-black tracking-widest mb-1"></span>
+                    <span class="text-3xl md:text-4xl font-black tracking-tighter"><span id="score">0</span> <span class="opacity-40 mx-1">/</span> <span id="total">9</span></span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8 items-start flex-grow">
+            <!-- 標章倉庫 -->
+            <aside class="w-full lg:w-1/3 bg-white/70 backdrop-blur p-5 md:p-6 rounded-[2.5rem] shadow-xl border border-white sticky top-4 z-20">
+                <div id="ui-warehouse-title" class="text-xl font-black mb-5 text-slate-700 flex items-center gap-2 lg:justify-start"></div>
+                <div id="badges-container" class="flex flex-row lg:grid lg:grid-cols-2 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 scrollbar-hide snap-x">
+                    <!-- 標章動態注入 -->
+                </div>
+            </aside>
+
+            <!-- 投放目標區 -->
+            <main class="w-full lg:w-2/3 space-y-5">
+                <div id="target-energy" class="drop-zone bg-orange-50 p-5 md:p-8 rounded-[2.5rem] shadow-inner" data-zone="energy">
+                    <div class="flex items-center gap-4 mb-5">
+                        <span class="bg-orange-500 text-white w-12 h-12 flex items-center justify-center rounded-2xl text-2xl shadow-lg">⚡</span>
+                        <span id="label-energy" class="text-xl md:text-2xl font-black text-orange-900 flex no-wrap-text"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-3 dropped-items min-h-[60px]"></div>
+                </div>
+
+                <div id="target-water" class="drop-zone bg-blue-50 p-5 md:p-8 rounded-[2.5rem] shadow-inner" data-zone="water">
+                    <div class="flex items-center gap-4 mb-5">
+                        <span class="bg-blue-500 text-white w-12 h-12 flex items-center justify-center rounded-2xl text-2xl shadow-lg">🚰</span>
+                        <span id="label-water" class="text-xl md:text-2xl font-black text-blue-900 flex no-wrap-text"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-3 dropped-items min-h-[60px]"></div>
+                </div>
+
+                <div id="target-green" class="drop-zone bg-green-50 p-5 md:p-8 rounded-[2.5rem] shadow-inner" data-zone="green">
+                    <div class="flex items-center gap-4 mb-5">
+                        <span class="bg-green-500 text-white w-12 h-12 flex items-center justify-center rounded-2xl text-2xl shadow-lg">🌳</span>
+                        <span id="label-green" class="text-xl md:text-2xl font-black text-green-900 flex no-wrap-text"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-3 dropped-items min-h-[60px]"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 勝利視窗 -->
+        <div id="victory-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[200] hidden p-4">
+            <div class="bg-white p-10 md:p-14 rounded-[3.5rem] shadow-2xl text-center max-w-sm w-full bounce-in border-8 border-green-50">
+                <div class="text-8xl mb-8">🎉</div>
+                <h2 id="win-title" class="text-3xl md:text-4xl font-black text-green-600 mb-3 flex justify-center no-wrap-text"></h2>
+                <p id="win-text" class="text-gray-500 mb-10 text-lg font-bold flex justify-center no-wrap-text"></p>
+                <div class="space-y-4">
+                    <button onclick="renderGame()" id="btn-restart" class="w-full py-5 bg-green-500 text-white text-2xl font-black rounded-3xl hover:bg-green-600 active:scale-95 transition-all shadow-xl shadow-green-200">
+                    </button>
+                    <button onclick="goHome()" id="btn-home-final" class="w-full py-4 text-gray-400 text-lg font-bold hover:text-gray-600 transition-colors">
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const content = {
+            zh: {
+                title: "節能環保英雄榜",
+                subtitle: "動動手指，把標章送回家！",
+                progress: "任務進度",
+                home: "回主畫面",
+                warehouse: "標章倉庫",
+                catEnergy: "節約能源與減碳",
+                catWater: "珍惜水資源",
+                catGreen: "綠色生活與回收",
+                badges: [
+                    { id: 'b1', icon: '💡', text: "節能標章", type: 'energy' },
+                    { id: 'b2', icon: '🚗', text: "電動車", type: 'energy' },
+                    { id: 'b3', icon: '👣', text: "減碳標籤", type: 'energy' },
+                    { id: 'b4', icon: '💧', text: "省水標章", type: 'water' },
+                    { id: 'b5', icon: '🚿', text: "省水噴頭", type: 'water' },
+                    { id: 'b6', icon: '🧺', text: "省水洗衣機", type: 'water' },
+                    { id: 'b7', icon: '♻️', text: "環保標章", type: 'green' },
+                    { id: 'b8', icon: '🔄', text: "資源回收", type: 'green' },
+                    { id: 'b9', icon: '🍱', text: "環保餐具", type: 'green' }
+                ],
+                winTitle: "挑戰成功！",
+                winText: "你救了地球一命喔！",
+                restart: "再玩一次"
+            },
+            zy: {
+                title: [{h:"節",z:"ㄐㄧㄝˊ"},{h:"能",z:"ㄋㄥˊ"},{h:"環",z:"ㄏㄨㄢˊ"},{h:"保",z:"ㄅㄠˇ"},{h:"英",z:"ㄧㄥ"},{h:"雄",z:"ㄒㄩㄥˊ"},{h:"榜",z:"ㄅㄤˇ"}],
+                subtitle: [{h:"請",z:"ㄑㄧㄥˇ"},{h:"幫",z:"ㄅㄤ"},{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"},{h:"找",z:"ㄓㄠˇ"},{h:"到",z:"ㄉㄠˋ"},{h:"家",z:"ㄐㄧㄚ"}],
+                progress: "ㄐㄧㄣˋ ㄉㄨˋ",
+                home: [{h:"回",z:"ㄏㄨㄟˊ"},{h:"主",z:"ㄓㄨˇ"},{h:"畫",z:"ㄏㄨㄚˋ"},{h:"面",z:"ㄇㄧㄢˋ"}],
+                warehouse: [{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"},{h:"盒",z:"ㄏㄜˊ"}],
+                catEnergy: [{h:"省",z:"ㄕㄥˇ"},{h:"電",z:"ㄉㄧㄢˋ"},{h:"省",z:"ㄕㄥˇ"},{h:"油",z:"ㄧㄡˊ"}],
+                catWater: [{h:"愛",z:"ㄞˋ"},{h:"惜",z:"ㄒㄧ"},{h:"水",z:"ㄕㄨㄟˇ"},{h:"滴",z:"ㄉㄧ"}],
+                catGreen: [{h:"回",z:"ㄏㄨㄟˊ"},{h:"收",z:"ㄕㄡ"},{h:"好",z:"ㄏㄠˇ"},{h:"棒",z:"ㄅㄤˋ"}],
+                badges: [
+                    { id: 'b1', icon: '💡', text: [{h:"省",z:"ㄕㄥˇ"},{h:"電",z:"ㄉㄧㄢˋ"},{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"}], type: 'energy' },
+                    { id: 'b2', icon: '🚗', text: [{h:"電",z:"ㄉㄧㄢˋ"},{h:"動",z:"ㄉㄨㄥˋ"},{h:"車",z:"ㄔㄜ"}], type: 'energy' },
+                    { id: 'b3', icon: '👣', text: [{h:"省",z:"ㄕㄥˇ"},{h:"碳",z:"ㄊㄢˋ"},{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"}], type: 'energy' },
+                    { id: 'b4', icon: '💧', text: [{h:"省",z:"ㄕㄥˇ"},{h:"水",z:"ㄕㄨㄟˇ"},{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"}], type: 'water' },
+                    { id: 'b5', icon: '🚿', text: [{h:"省",z:"ㄕㄥˇ"},{h:"水",z:"ㄕㄨㄟˇ"},{h:"龍",z:"ㄌㄨㄥˊ"},{h:"頭",z:"ㄊㄡˊ"}], type: 'water' },
+                    { id: 'b6', icon: '🧺', text: [{h:"省",z:"ㄕㄥˇ"},{h:"水",z:"ㄕㄨㄟˇ"},{h:"衣",z:"ㄧ"},{h:"機",z:"ㄐㄧ"}], type: 'water' },
+                    { id: 'b7', icon: '♻️', text: [{h:"環",z:"ㄏㄨㄢˊ"},{h:"保",z:"ㄅㄠˇ"},{h:"標",z:"ㄅㄧㄠ"},{h:"章",z:"ㄓㄤ"}], type: 'green' },
+                    { id: 'b8', icon: '🔄', text: [{h:"回",z:"ㄏㄨㄟˊ"},{h:"收",z:"ㄕㄡ"},{h:"標",z:"ㄅㄧㄠ"},{h:"誌",z:"ㄓˋ"}], type: 'green' },
+                    { id: 'b9', icon: '🍱', text: [{h:"環",z:"ㄏㄨㄢˊ"},{h:"保",z:"ㄅㄠˇ"},{h:"碗",z:"ㄨㄢˇ"},{h:"筷",z:"ㄎㄨㄞˋ"}], type: 'green' }
+                ],
+                winTitle: [{h:"好",z:"ㄏㄠˇ"},{h:"棒",z:"ㄅㄤˋ"},{h:"！",z:""}],
+                winText: [{h:"真",z:"ㄓㄣ"},{h:"是",z:"ㄕˋ"},{h:"環",z:"ㄏㄨㄢˊ"},{h:"保",z:"ㄅㄠˇ"},{h:"英",z:"ㄧㄥ"},{h:"雄",z:"ㄒㄩㄥˊ"}],
+                restart: [{h:"再",z:"ㄗㄞˋ"},{h:"玩",z:"ㄨㄢˊ"},{h:"一",z:"ㄧ"},{h:"次",z:"ㄘˋ"}]
+            }
+        };
+
+        let score = 0;
+        let currentMode = 'zh';
+
+        function shuffleArray(array) {
+            let shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function createTextHTML(data) {
+            if (currentMode === 'zh') return data;
+            return data.map(item => `<ruby>${item.h}<rt>${item.z}</rt></ruby>`).join('');
+        }
+
+        function startGame(mode) {
+            currentMode = mode;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            renderGame();
+        }
+
+        function goHome() {
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('victory-modal').classList.add('hidden');
+            score = 0;
+        }
+
+        function renderGame() {
+            score = 0;
+            document.getElementById('score').innerText = score;
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.querySelectorAll('.dropped-items').forEach(zone => zone.innerHTML = '');
+
+            const data = content[currentMode];
+            
+            document.getElementById('ui-title').innerHTML = createTextHTML(data.title);
+            document.getElementById('ui-subtitle').innerHTML = createTextHTML(data.subtitle);
+            document.getElementById('ui-progress-label').innerText = data.progress;
+            document.getElementById('ui-home-btn').innerHTML = createTextHTML(data.home);
+            
+            const warehouseEl = document.getElementById('ui-warehouse-title');
+            warehouseEl.innerHTML = `<span class="bg-slate-700 text-white px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase">Select</span> <div class="ml-1">${createTextHTML(data.warehouse)}</div>`;
+            
+            document.getElementById('label-energy').innerHTML = createTextHTML(data.catEnergy);
+            document.getElementById('label-water').innerHTML = createTextHTML(data.catWater);
+            document.getElementById('label-green').innerHTML = createTextHTML(data.catGreen);
+            
+            document.getElementById('win-title').innerHTML = createTextHTML(data.winTitle);
+            document.getElementById('win-text').innerHTML = createTextHTML(data.winText);
+            document.getElementById('btn-restart').innerHTML = createTextHTML(data.restart);
+            document.getElementById('btn-home-final').innerHTML = createTextHTML(data.home);
+
+            const container = document.getElementById('badges-container');
+            container.innerHTML = '';
+
+            const shuffledBadges = shuffleArray(data.badges);
+            shuffledBadges.forEach(b => {
+                const div = document.createElement('div');
+                div.id = b.id;
+                div.draggable = true;
+                div.className = "badge-card snap-center p-4 rounded-3xl border border-slate-200 flex flex-col items-center justify-center min-w-[120px] lg:w-full min-h-[120px] lg:min-h-[140px] shadow-sm shrink-0 hover:border-blue-300";
+                div.setAttribute('data-target', b.type);
+                div.innerHTML = `
+                    <div class="text-4xl md:text-5xl mb-3 pointer-events-none">${b.icon}</div>
+                    <div class="text-sm md:text-base font-black text-gray-700 no-wrap-text pointer-events-none">
+                        ${createTextHTML(b.text)}
+                    </div>`;
+                
+                div.addEventListener('dragstart', dragStart);
+                div.addEventListener('dragend', dragEnd);
+                div.addEventListener('click', function() {
+                    const zone = document.getElementById(`target-${b.type}`);
+                    if (zone) placeCorrectly(this, zone);
+                });
+                
+                container.appendChild(div);
+            });
+
+            document.getElementById('total').innerText = data.badges.length;
+            initDropZones();
+        }
+
+        function dragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.id);
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function initDropZones() {
+            const zones = document.querySelectorAll('.drop-zone');
+            zones.forEach(zone => {
+                zone.addEventListener('dragover', e => e.preventDefault());
+                zone.addEventListener('dragenter', function() { this.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
+                zone.addEventListener('drop', handleDrop);
+            });
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            const badgeId = e.dataTransfer.getData('text/plain');
+            const badge = document.getElementById(badgeId);
+            if (!badge) return;
+
+            if (badge.getAttribute('data-target') === this.getAttribute('data-zone')) {
+                placeCorrectly(badge, this);
+            } else {
+                playWrongEffect(badge);
+            }
+        }
+
+        function placeCorrectly(badge, zone) {
+            // 防止重複觸發
+            if (!badge.parentNode || badge.parentNode.id !== 'badges-container') return;
+            
+            score++;
+            document.getElementById('score').innerText = score;
+            
+            // 複製一個元素放到目標區
+            const item = badge.cloneNode(true);
+            
+            // 重要：修正 classList.add 不能包含空格的錯誤
+            // 先清除所有舊 class，重新賦予目標區所需的 class
+            item.className = "w-auto px-5 py-3 rounded-2xl bounce-in shadow-md flex flex-row items-center gap-3 border-2 border-white/80";
+            
+            const target = badge.getAttribute('data-target');
+            // 分開添加 class 以避免空格錯誤
+            if(target === 'energy') {
+                item.classList.add('bg-orange-400', 'text-white');
+            } else if(target === 'water') {
+                item.classList.add('bg-blue-400', 'text-white');
+            } else {
+                item.classList.add('bg-green-400', 'text-white');
+            }
+            
+            item.draggable = false;
+            
+            // 縮小 icon
+            item.querySelectorAll('div').forEach(el => {
+                if (el.classList.contains('text-4xl') || el.classList.contains('text-5xl')) {
+                    el.classList.remove('text-4xl', 'text-5xl');
+                    el.classList.add('text-2xl');
+                }
+            });
+            
+            zone.querySelector('.dropped-items').appendChild(item);
+            
+            // 移除倉庫中的原始物件
+            badge.remove();
+
+            // 特效
+            confetti({
+                particleCount: 40,
+                spread: 70,
+                origin: { y: 0.8 },
+                colors: ['#ffffff', '#60a5fa', '#34d399', '#fbbf24']
+            });
+
+            if (score === parseInt(document.getElementById('total').innerText)) {
+                setTimeout(showVictory, 600);
+            }
+        }
+
+        function playWrongEffect(badge) {
+            badge.classList.add('shake');
+            setTimeout(() => badge.classList.remove('shake'), 400);
+        }
+
+        function showVictory() {
+            const duration = 3000;
+            const end = Date.now() + duration;
+            (function frame() {
+                confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 } });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+            document.getElementById('victory-modal').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
